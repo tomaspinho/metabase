@@ -7,6 +7,7 @@ import { getIn } from "icepick";
 import { connect } from "react-redux";
 import { createSelector } from "reselect";
 import { AutoSizer, List } from "react-virtualized";
+import _ from "underscore";
 
 import Visualization from "metabase/visualizations/components/Visualization";
 import LoadingAndErrorWrapper from "metabase/components/LoadingAndErrorWrapper";
@@ -24,6 +25,7 @@ import { loadMetadataForQueries } from "metabase/redux/metadata";
 import Question from "metabase-lib/lib/Question";
 
 import { getVisualizationRaw } from "metabase/visualizations";
+import { SEARCH_DEBOUNCE_DURATION } from "metabase/lib/constants";
 
 const getQuestions = createSelector(
   [getMetadata, (state, ownProps) => ownProps.questions],
@@ -62,6 +64,10 @@ export default class AddSeriesModal extends Component {
   };
   static defaultProps = {};
 
+  updateSearchValueDebounced = _.debounce(value => {
+    this.setState({ searchValue: value });
+  }, SEARCH_DEBOUNCE_DURATION);
+
   async UNSAFE_componentWillMount() {
     const { questions, loadMetadataForQueries } = this.props;
     try {
@@ -76,9 +82,8 @@ export default class AddSeriesModal extends Component {
     MetabaseAnalytics.trackEvent("Dashboard", "Edit Series Modal", "search");
   };
 
-  handleSearchChange = e => {
-    this.setState({ searchValue: e.target.value.toLowerCase() });
-  };
+  handleSearchChange = e =>
+    this.updateSearchValueDebounced(e.target.value.toLowerCase());
 
   async handleQuestionSelectedChange(question, selected) {
     const { dashcard, dashcardData } = this.props;
