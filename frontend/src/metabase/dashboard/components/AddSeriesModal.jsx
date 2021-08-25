@@ -6,6 +6,7 @@ import cx from "classnames";
 import { getIn } from "icepick";
 import { connect } from "react-redux";
 import { createSelector } from "reselect";
+import { AutoSizer, List } from "react-virtualized";
 
 import Visualization from "metabase/visualizations/components/Visualization";
 import LoadingAndErrorWrapper from "metabase/components/LoadingAndErrorWrapper";
@@ -291,7 +292,7 @@ export default class AddSeriesModal extends Component {
           </div>
         </div>
         <div
-          className="border-left flex flex-column scroll-y"
+          className="border-left flex flex-column"
           style={{
             width: 370,
             backgroundColor: color("bg-light"),
@@ -313,50 +314,79 @@ export default class AddSeriesModal extends Component {
             />
           </div>
           <LoadingAndErrorWrapper
-            className="flex flex-full"
+            className="flex flex-full overflow-auto"
             loading={!filteredQuestions}
             error={error}
             noBackground
           >
             {() => (
-              <ul className="pr1">
-                {filteredQuestions.map(question => (
-                  <li
-                    key={question.id()}
-                    className={cx("my1 pl2 py1 flex align-center", {
-                      disabled: badQuestions[question.id()],
-                    })}
-                  >
-                    <span className="px1 flex-no-shrink">
-                      <CheckBox
-                        label={question.displayName()}
-                        checked={enabledQuestions[question.id()]}
-                        onChange={e =>
-                          this.handleQuestionSelectedChange(
-                            question,
-                            e.target.checked,
-                          )
-                        }
-                      />
-                    </span>
-                    {!question.isStructured() && (
-                      <Tooltip
-                        tooltip={t`We're not sure if this question is compatible`}
-                      >
-                        <Icon
-                          className="px1 flex-align-right text-light text-medium-hover cursor-pointer flex-no-shrink"
-                          name="warning"
-                          size={20}
-                        />
-                      </Tooltip>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <div className="pr1 pb2 w-full">
+                <AutoSizer>
+                  {({ width, height }) => (
+                    <List
+                      overscanRowCount={3}
+                      width={width}
+                      height={height}
+                      rowCount={filteredQuestions.length}
+                      rowHeight={36}
+                      rowRenderer={({ index, key, style }) => {
+                        const question = filteredQuestions[index];
+                        const isEnabled = enabledQuestions[question.id()];
+                        const isBad = badQuestions[question.id()];
+
+                        return (
+                          <QuestionListItem
+                            key={key}
+                            question={question}
+                            isEnabled={isEnabled}
+                            isBad={isBad}
+                            style={style}
+                            onChange={e =>
+                              this.handleQuestionSelectedChange(
+                                question,
+                                e.target.checked,
+                              )
+                            }
+                          />
+                        );
+                      }}
+                    />
+                  )}
+                </AutoSizer>
+              </div>
             )}
           </LoadingAndErrorWrapper>
         </div>
       </div>
     );
   }
+}
+
+function QuestionListItem({ question, onChange, isEnabled, isBad, style }) {
+  return (
+    <li
+      key={question.id()}
+      style={style}
+      className={cx("my1 pl2 py1 flex align-center", {
+        disabled: isBad,
+      })}
+    >
+      <span className="px1 flex-no-shrink">
+        <CheckBox
+          label={question.displayName()}
+          checked={isEnabled}
+          onChange={onChange}
+        />
+      </span>
+      {!question.isStructured() && (
+        <Tooltip tooltip={t`We're not sure if this question is compatible`}>
+          <Icon
+            className="px1 flex-align-right text-light text-medium-hover cursor-pointer flex-no-shrink"
+            name="warning"
+            size={20}
+          />
+        </Tooltip>
+      )}
+    </li>
+  );
 }
