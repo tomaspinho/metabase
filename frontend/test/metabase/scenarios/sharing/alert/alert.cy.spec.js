@@ -1,6 +1,6 @@
 import {
   restore,
-  setupLocalHostEmail,
+  setupDummySMTP,
   createBasicAlert,
   popover,
   openPeopleTable,
@@ -54,8 +54,7 @@ describe("scenarios > alert", () => {
     before(() => {
       // NOTE: Must run `python -m smtpd -n -c DebuggingServer localhost:1025` before these tests
       cy.signInAsAdmin();
-      cy.visit("/admin/settings/email");
-      setupLocalHostEmail();
+      setupDummySMTP();
       cy.server();
     });
 
@@ -83,8 +82,7 @@ describe("scenarios > alert", () => {
     before(() => {
       restore();
       cy.signInAsAdmin();
-      cy.visit("/admin/settings/email");
-      setupLocalHostEmail();
+      setupDummySMTP();
     });
 
     describe("'rows present' alert", () => {
@@ -147,11 +145,10 @@ describe("scenarios > alert", () => {
     before(() => {
       restore();
       cy.signInAsAdmin();
-      cy.visit("/admin/settings/email");
-      setupLocalHostEmail();
+      setupDummySMTP();
     });
 
-    it.skip("should fall back to raw data alert and show a warning", () => {
+    it("should fall back to raw data alert and show a warning", () => {
       // Create a time-multiseries q
       openPeopleTable();
       cy.findByText("Summarize").click();
