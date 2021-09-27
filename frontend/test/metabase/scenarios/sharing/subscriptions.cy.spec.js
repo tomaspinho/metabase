@@ -323,7 +323,7 @@ describe("scenarios > dashboard > subscriptions", () => {
         );
       });
 
-      it.only("should validate for approved email domains", () => {
+      it("should validate for approved email domains", () => {
         setAllowedEmailDomains("metabase.com");
         addEmailRecipient("example@example.com");
 
