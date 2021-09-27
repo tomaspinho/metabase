@@ -119,7 +119,7 @@ describe("scenarios > dashboard > subscriptions", () => {
     });
 
     it("should persist attachments for dashboard subscriptions (metabase#14117)", () => {
-      assignRecipient();
+      addUserRecipient();
       // This is extremely fragile
       // TODO: update test once changes from `https://github.com/metabase/metabase/pull/14121` are merged into `master`
       cy.findByText("Attach results")
@@ -142,7 +142,7 @@ describe("scenarios > dashboard > subscriptions", () => {
     });
 
     it("should not display 'null' day of the week (metabase#14405)", () => {
-      assignRecipient();
+      addUserRecipient();
       cy.findByText("To:").click();
       cy.get(".AdminSelect")
         .contains("Hourly")
@@ -221,7 +221,7 @@ describe("scenarios > dashboard > subscriptions", () => {
                 ],
               });
             });
-            assignRecipient({ dashboard_id: DASHBOARD_ID });
+            addUserRecipient({ dashboard_id: DASHBOARD_ID });
           },
         );
       });
@@ -248,7 +248,7 @@ describe("scenarios > dashboard > subscriptions", () => {
       ).type(TEXT_CARD);
       cy.button("Save").click();
       cy.findByText("You're editing this dashboard.").should("not.exist");
-      assignRecipient();
+      addUserRecipient();
       // Click outside popover to close it and at the same time check that the text card content is shown as expected
       cy.findByText(TEXT_CARD).click();
       cy.findByText("Send email now").click();
@@ -298,7 +298,7 @@ describe("scenarios > dashboard > subscriptions", () => {
       });
 
       it("should have a list of the default parameters applied to the subscription", () => {
-        assignRecipient();
+        addUserRecipient();
         cy.findByText("Text is Corbin Mertz");
         clickButton("Done");
 
@@ -322,6 +322,18 @@ describe("scenarios > dashboard > subscriptions", () => {
           "not.exist",
         );
       });
+
+      it.only("should validate for approved email domains", () => {
+        setAllowedEmailDomains("metabase.com");
+        addEmailRecipient("example@example.com");
+
+        sidebar().within(() => {
+          clickButton("Done");
+          cy.findByText(
+            'You cannot create new subscriptions for the domain "example.com". Allowed domains are: metabase.com',
+          );
+        });
+      });
     });
 
     describe("with parameters", () => {
@@ -330,14 +342,14 @@ describe("scenarios > dashboard > subscriptions", () => {
       });
 
       it("should show a filter description containing default values, even when not explicitly added to subscription", () => {
-        assignRecipient();
+        addUserRecipient();
         clickButton("Done");
 
         cy.findByText("Text is Corbin Mertz");
       });
 
       it("should allow for setting parameters in subscription", () => {
-        assignRecipient();
+        addUserRecipient();
         clickButton("Done");
 
         cy.findByText("Emailed hourly").click();
@@ -383,13 +395,22 @@ function openDashboardSubscriptions(dashboard_id = 1) {
   cy.findByText("Dashboard subscriptions").click();
 }
 
-function assignRecipient({ user = admin, dashboard_id = 1 } = {}) {
+function addUserRecipient({ user = admin, dashboard_id = 1 } = {}) {
   openDashboardSubscriptions(dashboard_id);
   cy.findByText("Email it").click();
   cy.findByPlaceholderText("Enter user names or email addresses")
     .click()
     .type(`${user.first_name} ${user.last_name}{enter}`)
     .blur(); // blur is needed to close the popover
+}
+
+function addEmailRecipient(email, dashboard_id = 1) {
+  openDashboardSubscriptions(dashboard_id);
+  cy.findByText("Email it").click();
+  cy.findByPlaceholderText("Enter user names or email addresses")
+    .click()
+    .type(`${email}{enter}`)
+    .blur();
 }
 
 function clickButton(button_name) {
@@ -400,7 +421,7 @@ function clickButton(button_name) {
 }
 
 function createEmailSubscription() {
-  assignRecipient();
+  addUserRecipient();
   clickButton("Done");
 }
 
@@ -474,5 +495,11 @@ function mockSlackConfigured() {
         configured: true,
       },
     },
+  });
+}
+
+function setAllowedEmailDomains(domains) {
+  cy.request("PUT", "/api/setting/subscription-allowed-domains", {
+    value: domains,
   });
 }
