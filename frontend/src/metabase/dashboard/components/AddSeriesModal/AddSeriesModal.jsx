@@ -2,18 +2,11 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
 import { t } from "ttag";
-import cx from "classnames";
 import { getIn } from "icepick";
 import { connect } from "react-redux";
 import { createSelector } from "reselect";
-import { AutoSizer, List } from "react-virtualized";
-import _ from "underscore";
 
 import Visualization from "metabase/visualizations/components/Visualization";
-import LoadingAndErrorWrapper from "metabase/components/LoadingAndErrorWrapper";
-import Icon from "metabase/components/Icon";
-import Tooltip from "metabase/components/Tooltip";
-import CheckBox from "metabase/components/CheckBox";
 
 import MetabaseAnalytics from "metabase/lib/analytics";
 import { color } from "metabase/lib/colors";
@@ -25,7 +18,8 @@ import { loadMetadataForQueries } from "metabase/redux/metadata";
 import Question from "metabase-lib/lib/Question";
 
 import { getVisualizationRaw } from "metabase/visualizations";
-import { SEARCH_DEBOUNCE_DURATION } from "metabase/lib/constants";
+
+import { QuestionList } from "./QuestionList";
 
 const getQuestions = createSelector(
   [getMetadata, (state, ownProps) => ownProps.questions],
@@ -46,10 +40,10 @@ export default class AddSeriesModal extends Component {
     super(props, context);
 
     this.state = {
-      searchValue: "",
       error: null,
       series: props.dashcard.series || [],
       badQuestions: {},
+      isLoadingMetadata: false,
     };
   }
 
@@ -64,28 +58,7 @@ export default class AddSeriesModal extends Component {
   };
   static defaultProps = {};
 
-  updateSearchValueDebounced = _.debounce(value => {
-    this.setState({ searchValue: value });
-  }, SEARCH_DEBOUNCE_DURATION);
-
-  async UNSAFE_componentWillMount() {
-    const { questions, loadMetadataForQueries } = this.props;
-    try {
-      await loadMetadataForQueries(questions.map(question => question.query()));
-    } catch (error) {
-      console.error("AddSeriesModal loadMetadataForQueries", error);
-      this.setState({ error });
-    }
-  }
-
-  handleSearchFocus = () => {
-    MetabaseAnalytics.trackEvent("Dashboard", "Edit Series Modal", "search");
-  };
-
-  handleSearchChange = e =>
-    this.updateSearchValueDebounced(e.target.value.toLowerCase());
-
-  async handleQuestionSelectedChange(question, selected) {
+  handleQuestionSelectedChange = async (question, selected) => {
     const { dashcard, dashcardData } = this.props;
     const { visualization } = getVisualizationRaw([{ card: dashcard.card }]);
     const card = question.card();
@@ -150,7 +123,7 @@ export default class AddSeriesModal extends Component {
       });
       setTimeout(() => this.setState({ state: null }), 2000);
     }
-  }
+  };
 
   handleRemoveSeries(card) {
     this.setState({ series: this.state.series.filter(c => c.id !== card.id) });
@@ -166,74 +139,19 @@ export default class AddSeriesModal extends Component {
     MetabaseAnalytics.trackEvent("Dashboard", "Edit Series Modal", "done");
   };
 
-  filteredQuestions = () => {
-    const { questions, dashcard, dashcardData } = this.props;
-    const { searchValue } = this.state;
-
-    const initialSeries = {
-      card: dashcard.card,
-      data: getIn(dashcardData, [dashcard.id, dashcard.card.id, "data"]),
-    };
-
-    const { visualization } = getVisualizationRaw([{ card: dashcard.card }]);
-
-    return questions.filter(question => {
-      try {
-        // filter out the card itself
-        if (question.id() === dashcard.card.id) {
-          return false;
-        }
-        if (question.isStructured()) {
-          if (
-            !visualization.seriesAreCompatible(initialSeries, {
-              card: question.card(),
-              data: { cols: question.query().columns(), rows: [] },
-            })
-          ) {
-            return false;
-          }
-        }
-        // search
-        if (
-          searchValue &&
-          question
-            .displayName()
-            .toLowerCase()
-            .indexOf(searchValue) < 0
-        ) {
-          return false;
-        }
-        return true;
-      } catch (e) {
-        console.warn(e);
-        return false;
-      }
-    });
+  handleLoadMetadata = async queries => {
+    this.setState({ isLoadingMetadata: true });
+    await this.props.loadMetadataForQueries(queries);
+    this.setState({ isLoadingMetadata: false });
   };
 
   render() {
     const { dashcard, dashcardData, questions } = this.props;
     const { badQuestions } = this.state;
 
-    let error = this.state.error;
+    const { visualization } = getVisualizationRaw([{ card: dashcard.card }]);
 
-    let filteredQuestions;
-    if (!error && questions) {
-      filteredQuestions = this.filteredQuestions();
-      if (filteredQuestions.length === 0) {
-        error = new Error("Whoops, no compatible questions match your search.");
-      }
-      // SQL cards at the bottom
-      filteredQuestions.sort((a, b) => {
-        if (!a.isNative()) {
-          return 1;
-        } else if (!b.isNative()) {
-          return -1;
-        } else {
-          return 0;
-        }
-      });
-    }
+    const error = this.state.error;
 
     const enabledQuestions = {};
     for (const card of this.state.series) {
@@ -304,94 +222,20 @@ export default class AddSeriesModal extends Component {
             borderColor: color("border"),
           }}
         >
-          <div
-            className="flex-no-shrink border-bottom flex flex-row align-center"
-            style={{ borderColor: color("border") }}
-          >
-            <Icon className="ml2" name="search" size={16} />
-            <input
-              className="h4 input full pl1"
-              style={{ border: "none", backgroundColor: "transparent" }}
-              type="search"
-              placeholder={t`Search for a question`}
-              onFocus={this.handleSearchFocus}
-              onChange={this.handleSearchChange}
-            />
-          </div>
-          <LoadingAndErrorWrapper
-            className="flex flex-full overflow-auto"
-            loading={!filteredQuestions}
+          <QuestionList
+            questions={questions}
+            badQuestions={badQuestions}
+            enabledQuestions={enabledQuestions}
             error={error}
-            noBackground
-          >
-            {() => (
-              <div className="pr1 pb2 w-full">
-                <AutoSizer>
-                  {({ width, height }) => (
-                    <List
-                      overscanRowCount={3}
-                      width={width}
-                      height={height}
-                      rowCount={filteredQuestions.length}
-                      rowHeight={36}
-                      rowRenderer={({ index, key, style }) => {
-                        const question = filteredQuestions[index];
-                        const isEnabled = enabledQuestions[question.id()];
-                        const isBad = badQuestions[question.id()];
-
-                        return (
-                          <QuestionListItem
-                            key={key}
-                            question={question}
-                            isEnabled={isEnabled}
-                            isBad={isBad}
-                            style={style}
-                            onChange={e =>
-                              this.handleQuestionSelectedChange(
-                                question,
-                                e.target.checked,
-                              )
-                            }
-                          />
-                        );
-                      }}
-                    />
-                  )}
-                </AutoSizer>
-              </div>
-            )}
-          </LoadingAndErrorWrapper>
+            onSelect={this.handleQuestionSelectedChange}
+            dashcard={this.props.dashcard}
+            dashcardData={this.props.dashcardData}
+            loadMetadataForQueries={this.handleLoadMetadata}
+            visualization={visualization}
+            isLoadingMetadata={this.state.isLoadingMetadata}
+          />
         </div>
       </div>
     );
   }
-}
-
-function QuestionListItem({ question, onChange, isEnabled, isBad, style }) {
-  return (
-    <li
-      key={question.id()}
-      style={style}
-      className={cx("my1 pl2 py1 flex align-center", {
-        disabled: isBad,
-      })}
-    >
-      <span className="px1 flex-no-shrink">
-        <CheckBox
-          label={question.displayName()}
-          checked={isEnabled}
-          onChange={onChange}
-        />
-      </span>
-      {!question.isStructured() && (
-        <Tooltip tooltip={t`We're not sure if this question is compatible`}>
-          <Icon
-            className="px1 flex-align-right text-light text-medium-hover cursor-pointer flex-no-shrink"
-            name="warning"
-            size={20}
-          />
-        </Tooltip>
-      )}
-    </li>
-  );
 }
