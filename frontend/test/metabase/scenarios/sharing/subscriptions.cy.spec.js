@@ -324,13 +324,13 @@ describe("scenarios > dashboard > subscriptions", () => {
       });
 
       it("should validate for approved email domains", () => {
-        setAllowedEmailDomains("metabase.com");
-        addEmailRecipient("example@example.com");
+        setAllowedEmailDomains("metabase.example");
+        addEmailRecipient("mailer@metabase.test");
 
         sidebar().within(() => {
           clickButton("Done");
           cy.findByText(
-            'You cannot create new subscriptions for the domain "example.com". Allowed domains are: metabase.com',
+            'You cannot create new subscriptions for the domain "metabase.test". Allowed domains are: metabase.example',
           );
         });
       });
