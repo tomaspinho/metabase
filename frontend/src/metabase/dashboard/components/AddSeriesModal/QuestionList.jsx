@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { t } from "ttag";
 import cx from "classnames";
 import { getIn } from "icepick";
@@ -15,7 +15,7 @@ import { color } from "metabase/lib/colors";
 
 import { LoadMoreButton, LoadMoreRow } from "./QuestionList.styled";
 
-const CHUNK_SIZE = 100;
+const CHUNK_SIZE = 15;
 
 const isQuestionCompatible = (
   visualization,
@@ -44,24 +44,9 @@ const isQuestionCompatible = (
       }
     }
     return true;
-  } catch {
+  } catch (e) {
     return false;
   }
-};
-
-const fetchNextChunk = async (
-  questions = [],
-  startIndex,
-  endIndex,
-  fetchMetadata,
-) => {
-  const questionsChunk = questions.slice(startIndex, endIndex);
-
-  if (questionsChunk.length === 0) {
-    return;
-  }
-
-  await fetchMetadata(questionsChunk.map(question => question.query()));
 };
 
 export const QuestionList = React.memo(function QuestionList({
@@ -76,7 +61,6 @@ export const QuestionList = React.memo(function QuestionList({
   visualization,
   isLoadingMetadata,
 }) {
-  const [cursor, setCursor] = useState(0);
   const [searchText, setSearchText] = useState("");
 
   const handleSearchFocus = () => {
@@ -105,11 +89,6 @@ export const QuestionList = React.memo(function QuestionList({
     return filteredQuestions;
   }, [questions, searchText]);
 
-  useEffect(() => {
-    handleLoadNext();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredQuestions.length]);
-
   const compatibleQuestions = useMemo(
     () =>
       filteredQuestions?.filter(question =>
@@ -118,21 +97,32 @@ export const QuestionList = React.memo(function QuestionList({
     [dashcard, dashcardData, filteredQuestions, visualization],
   );
 
-  const handleLoadNext = async () => {
-    if (filteredQuestions.length !== 0) {
-      const loadUntilIndex = cursor + CHUNK_SIZE;
-      setCursor(loadUntilIndex);
+  const questionsWithoutMetadata = useMemo(
+    () =>
+      filteredQuestions.filter(
+        question => question.isStructured() && !question.query().hasMetadata(),
+      ),
+    [filteredQuestions],
+  );
 
-      await fetchNextChunk(
-        filteredQuestions,
-        cursor,
-        loadUntilIndex,
-        loadMetadataForQueries,
-      );
+  const handleLoadNext = useCallback(async () => {
+    if (questionsWithoutMetadata.length === 0) {
+      return;
     }
-  };
 
-  const canLoadMore = cursor < filteredQuestions.length;
+    const questionsChunk = questionsWithoutMetadata.slice(0, CHUNK_SIZE);
+
+    await loadMetadataForQueries(
+      questionsChunk.map(question => question.query()),
+    );
+  }, [loadMetadataForQueries, questionsWithoutMetadata]);
+
+  useEffect(() => {
+    handleLoadNext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredQuestions.length]);
+
+  const canLoadMore = questionsWithoutMetadata.length > 0;
   const rowsCount = canLoadMore
     ? compatibleQuestions.length + 1
     : compatibleQuestions.length;
