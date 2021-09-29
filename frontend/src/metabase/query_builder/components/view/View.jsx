@@ -39,6 +39,8 @@ import { Motion, spring } from "react-motion";
 import NativeQuery from "metabase-lib/lib/queries/NativeQuery";
 import StructuredQuery from "metabase-lib/lib/queries/StructuredQuery";
 
+import { NotebookContainer } from "./View.styled";
+
 const DEFAULT_POPOVER_STATE = {
   aggregationIndex: null,
   aggregationPopoverTarget: null,
@@ -222,39 +224,9 @@ export default class View extends React.Component {
 
           <div className="flex flex-full relative">
             {query instanceof StructuredQuery && (
-              <Motion
-                defaultStyle={
-                  isNewQuestion
-                    ? { opacity: 1, translateY: 0 }
-                    : { opacity: 0, translateY: -100 }
-                }
-                style={
-                  queryBuilderMode === "notebook"
-                    ? {
-                        opacity: spring(1),
-                        translateY: spring(0),
-                      }
-                    : {
-                        opacity: spring(0),
-                        translateY: spring(-100),
-                      }
-                }
-              >
-                {({ opacity, translateY }) =>
-                  opacity > 0 ? (
-                    // note the `bg-white class here is necessary to obscure the other layer
-                    <div
-                      className="spread bg-white scroll-y z2 border-top border-bottom"
-                      style={{
-                        // opacity: opacity,
-                        transform: `translateY(${translateY}%)`,
-                      }}
-                    >
-                      <Notebook {...this.props} />
-                    </div>
-                  ) : null
-                }
-              </Motion>
+              <NotebookContainer isOpen={queryBuilderMode === "notebook"}>
+                <Notebook {...this.props} />
+              </NotebookContainer>
             )}
 
             <ViewSidebar side="left" isOpen={!!leftSideBar}>
