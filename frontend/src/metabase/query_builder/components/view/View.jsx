@@ -195,6 +195,9 @@ export default class View extends React.Component {
 
     const isSidebarOpen = leftSideBar || rightSideBar;
 
+    const isNotebookContainerOpen =
+      isNewQuestion || queryBuilderMode === "notebook";
+
     return (
       <div className={fitClassNames}>
         <div className={cx("QueryBuilder flex flex-column bg-white spread")}>
@@ -224,8 +227,8 @@ export default class View extends React.Component {
 
           <div className="flex flex-full relative">
             {query instanceof StructuredQuery && (
-              <NotebookContainer isOpen={queryBuilderMode === "notebook"}>
-                <Notebook {...this.props} />
+              <NotebookContainer isOpen={isNotebookContainerOpen}>
+                {isNotebookContainerOpen && <Notebook {...this.props} />}
               </NotebookContainer>
             )}
 
